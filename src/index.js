@@ -1,29 +1,30 @@
 import Buzz from './framework';
 
-const { useState } = Buzz;
+const { useState, useRef } = Buzz;
 
 const Message = () => {
   const [message, setMessage] = useState("Hello");
 
   return (
-    <h1
-      onClick={(e) => {
-        setMessage((message) => message + message);
-      }}
-    >
-      Click Me! {message}
-    </h1>
+    <div>
+      <h3>Child Component</h3>
+      <p>{message}</p>
+      <button onClick={(e) => setMessage(message + '!')}>Click</button>
+    </div>
   );
 };
 
 const App = () => {
   const [count, setCount] = useState(0);
   const [num, setNum] = useState(100);
+  const ref = useRef(null);
 
   /** @jsx Buzz.createElement */
   return (
     <div>
-      <h1>Hello zeact</h1>
+      <h1 ref={ref} onClick={() => {
+        console.log(ref);
+      }}>Hello zeact</h1>
       <hr/>
       <h2>Count: {count}</h2>
       <button onClick={() => setCount(count + 1)}>Add</button>
@@ -35,7 +36,8 @@ const App = () => {
         setNum(num + 2);
       }}>Add</button>
       <button onClick={() => setNum(num - 1)}>Sub</button>
-      {/* <Message /> */}
+      <hr />
+      <Message />
     </div>
   );
 };

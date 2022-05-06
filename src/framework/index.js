@@ -137,6 +137,10 @@ const reconcileChildren = (fiber, vdoms) => {
 const updateHostComponent = (fiber) => {
   if (!fiber.dom) {
     fiber.dom = createDOM(fiber);
+    
+    if (fiber?.props?.ref) {
+      fiber.props.ref.current = fiber.dom;
+    }
   }
 
   reconcileChildren(fiber, fiber.props.children);
@@ -202,10 +206,7 @@ const render = (vdom, container) => {
  * @returns 
  */
 const useState = (initialState) => {
-  const oldHook =
-    wipFiber.alternate &&
-    wipFiber.alternate.hooks &&
-    wipFiber.alternate.hooks[hookIndex];
+  const oldHook = wipFiber?.alternate?.hooks?.[hookIndex];
   const hook = {
     state: oldHook ? oldHook.state : initialState,
     queue: []
@@ -232,8 +233,21 @@ const useState = (initialState) => {
   return [hook.state, setState];
 };
 
+const useRef = (initialValue) => {
+  const oldHook = wipFiber?.alternate?.hooks?.[hookIndex];
+  const ref = { current: initialValue };
+  const hook = {
+    state: oldHook?.state || ref
+  };
+
+  wipFiber.hooks.push(hook);
+  hookIndex ++;
+  return ref;
+};
+
 export default {
   createElement,
   render,
-  useState
+  useState,
+  useRef,
 };
