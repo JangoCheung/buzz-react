@@ -1,6 +1,6 @@
 import Buzz from './framework';
 
-const { useState, useRef } = Buzz;
+const { useState, useRef, useEffect } = Buzz;
 
 const Message = () => {
   const [message, setMessage] = useState("Hello");
@@ -18,6 +18,21 @@ const App = () => {
   const [count, setCount] = useState(0);
   const [num, setNum] = useState(100);
   const ref = useRef(null);
+
+  useEffect(() => {
+    console.log('didMount');
+    console.log(ref);
+
+    return () => {
+      console.log('willUnmount');
+    }
+  }, []);
+
+  useEffect(() => {
+    console.log(num);
+
+    return () => console.log(num);
+  }, [num]);
 
   /** @jsx Buzz.createElement */
   return (

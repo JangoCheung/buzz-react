@@ -9,7 +9,6 @@ let wipFiber = null;
 let deletions = [];
 
 const commitRoot = () => {
-  console.log(currentRoot);
   // 删除旧节点
   deletions.forEach(commitWork);
   commitWork(wipRoot.child);
@@ -29,10 +28,18 @@ const commitWork = (fiber) => {
   const sibling = isFunctionComponent ? fiber.child.sibling : fiber.sibling;
 
   if (fiber.effectTag === "PLACEMENT") {
-    domParent.appendChild(dom);
+    if (dom != null) {
+      domParent.appendChild(dom);
+    }
+    runEffects(fiber);
   } else if (fiber.effectTag === "UPDATE") {
-    updateDom(dom, fiber.alternate.props, fiber.props);
+    cancelEffects(fiber);
+    if (fiber.dom !== null) {
+      updateDom(dom, fiber.alternate.props, fiber.props);
+    }
+    runEffects(fiber);
   } else if (fiber.effectTag === "DELETION") {
+    cancelEffects(fiber);
     commitDeletion(fiber, domParent);
     return;
   }
@@ -43,9 +50,9 @@ const commitWork = (fiber) => {
 
 function commitDeletion(fiber, domParent) {
   if (fiber.dom) {
-    domParent.removeChild(fiber.dom)
+    domParent.removeChild(fiber.dom);
   } else {
-    commitDeletion(fiber.child, domParent)
+    commitDeletion(fiber.child, domParent);
   }
 }
 
@@ -98,7 +105,7 @@ const reconcileChildren = (fiber, vdoms) => {
         dom: oldFiber.dom,
         parent: fiber,
         alternate: oldFiber,
-        effectTag: "UPDATE"
+        effectTag: "UPDATE",
       };
     }
 
@@ -109,7 +116,7 @@ const reconcileChildren = (fiber, vdoms) => {
         dom: null,
         parent: fiber,
         alternate: null,
-        effectTag: "PLACEMENT"
+        effectTag: "PLACEMENT",
       };
     }
 
@@ -137,7 +144,7 @@ const reconcileChildren = (fiber, vdoms) => {
 const updateHostComponent = (fiber) => {
   if (!fiber.dom) {
     fiber.dom = createDOM(fiber);
-    
+
     if (fiber?.props?.ref) {
       fiber.props.ref.current = fiber.dom;
     }
@@ -191,9 +198,9 @@ const render = (vdom, container) => {
   wipRoot = {
     dom: container,
     props: {
-      children: [vdom]
+      children: [vdom],
     },
-    alternate: currentRoot
+    alternate: currentRoot,
   };
   deletions = [];
   nextUnitOfWork = wipRoot;
@@ -202,19 +209,19 @@ const render = (vdom, container) => {
 /**
  * 1. 为当前 hook 设置索引位置，新增or使用上一次 hook state
  * 2. 回调执行后更新 fiber 数，让 schdule 更新数
- * @param {any} initialState 
- * @returns 
+ * @param {any} initialState
+ * @returns
  */
 const useState = (initialState) => {
   const oldHook = wipFiber?.alternate?.hooks?.[hookIndex];
   const hook = {
     state: oldHook ? oldHook.state : initialState,
-    queue: []
+    queue: [],
   };
 
   const actions = oldHook ? oldHook.queue : [];
   actions.forEach((action) => {
-    hook.state = typeof action === 'function' ? action(hook.state) : action;
+    hook.state = typeof action === "function" ? action(hook.state) : action;
   });
 
   const setState = (action) => {
@@ -222,7 +229,7 @@ const useState = (initialState) => {
     wipRoot = {
       dom: currentRoot.dom,
       props: currentRoot.props,
-      alternate: currentRoot
+      alternate: currentRoot,
     };
     nextUnitOfWork = wipRoot;
     deletions = [];
@@ -237,17 +244,62 @@ const useRef = (initialValue) => {
   const oldHook = wipFiber?.alternate?.hooks?.[hookIndex];
   const ref = { current: initialValue };
   const hook = {
-    state: oldHook?.state || ref
+    state: oldHook?.state || ref,
   };
 
   wipFiber.hooks.push(hook);
-  hookIndex ++;
+  hookIndex++;
   return ref;
 };
+
+function cancelEffects(fiber) {
+  if (fiber.hooks) {
+    fiber.hooks
+      .filter((hook) => hook.tag === "effect" && hook.cancel)
+      .forEach((effectHook) => {
+        effectHook.cancel();
+      });
+  }
+}
+
+function runEffects(fiber) {
+  if (fiber.hooks) {
+    fiber.hooks
+      .filter((hook) => hook.tag === "effect" && hook.effect)
+      .forEach((effectHook) => {
+        effectHook.cancel = effectHook.effect();
+      });
+  }
+}
+
+const hasDepsChanged = (prevDeps, nextDeps) => {
+  if (!prevDeps) return true;
+  if (!nextDeps) return true;
+
+  if (prevDeps.length !== nextDeps.length) return true;
+  if (prevDeps.some((dep, index) => dep !== nextDeps[index])) return true;
+
+  return false;
+}
+
+function useEffect(effect, deps) {
+  const oldHook = wipFiber?.alternate?.hooks?.[hookIndex];
+  const hasChanged = hasDepsChanged(oldHook?.deps ?? undefined, deps);
+  const hook = {
+    tag: "effect",
+    effect: hasChanged ? effect : null,
+    cancel: hasChanged && oldHook?.cancel,
+    deps,
+  };
+
+  wipFiber.hooks.push(hook);
+  hookIndex++;
+}
 
 export default {
   createElement,
   render,
   useState,
   useRef,
+  useEffect,
 };

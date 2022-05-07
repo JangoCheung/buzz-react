@@ -1,3 +1,5 @@
+# Buzz-React
+
 > 徒手写一个基于 Fiber 和 Hooks 的 React Likely Framework
 
 ## 简介
@@ -86,6 +88,39 @@ const updateHostComponent = (fiber) => {
 
 ### useEffect
 
-两个参数，第一个是回调，第二是监听的数据
+两个参数，第一个是回调，第二是监听的数据，关键点：
+```javascript
+function useEffect(effect, deps) {
+  const oldHook = wipFiber?.alternate?.hooks?.[hookIndex];
+  const hasChanged = hasDepsChanged(oldHook?.deps ?? undefined, deps);
+  const hook = {
+    tag: "effect",
+    effect: hasChanged ? effect : null,
+    cancel: hasChanged && oldHook?.cancel,
+    deps,
+  };
 
-// TODO
+  wipFiber.hooks.push(hook);
+  hookIndex++;
+}
+
+// commitWork 阶段需要做DOM的回调
+......
+if (fiber.effectTag === "PLACEMENT") {
+  if (dom != null) {
+    domParent.appendChild(dom);
+  }
+  runEffects(fiber);
+} else if (fiber.effectTag === "UPDATE") {
+  cancelEffects(fiber);
+  if (fiber.dom !== null) {
+    updateDom(dom, fiber.alternate.props, fiber.props);
+  }
+  runEffects(fiber);
+} else if (fiber.effectTag === "DELETION") {
+  cancelEffects(fiber);
+  commitDeletion(fiber, domParent);
+  return;
+}
+......
+```
